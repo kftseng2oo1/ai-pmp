@@ -1,0 +1,54 @@
+{
+  "name": "Ai-PMP",
+  "short_name": "Ai-PMP",
+  "description": "\nAi-PMP",
+  "start_url": "/ai-pmp/",
+  "scope": "/ai-pmp/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1a73e8",
+  "background_color": "#ffffff",
+  "lang": "zh-TW",
+  "categories": [
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "開啟 Ai-PMP",
+      "short_name": "Ai-PMP",
+      "url": "/ai-pmp/",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
