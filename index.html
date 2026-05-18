@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✦ PROMPT STUDIO · AI 提示詞生成器</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0a0a08;
+  --surface: #111110;
+  --surface2: #1a1a17;
+  --border: #2a2a25;
+  --accent: #c9a84c;
+  --accent2: #e8d5a0;
+  --accent-dim: rgba(201,168,76,0.15);
+  --text: #e8e4d8;
+  --text-dim: #8a8678;
+  --text-muted: #4a4840;
+  --green: #6b8f6b;
+  --red: #8f6b6b;
+  --radius: 4px;
+}
+
+body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; overflow-x:hidden; }
+
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999; opacity:0.4;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+/* ─── HEADER ─── */
+header {
+  border-bottom:1px solid var(--border); padding:20px 32px;
+  display:flex; align-items:center; justify-content:space-between;
+  position:sticky; top:0; background:rgba(10,10,8,0.95); backdrop-filter:blur(12px); z-index:100;
+}
+.logo { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:300; letter-spacing:0.15em; color:var(--accent); }
+.logo span { font-style:italic; }
+.badge { font-size:9px; letter-spacing:0.2em; color:var(--text-dim); text-transform:uppercase; }
+
+.key-indicator {
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  padding:4px 10px; border:1px solid var(--border); border-radius:var(--radius); transition:border-color .15s;
+}
+.key-indicator:hover { border-color:var(--accent); }
+.key-dot { width:6px; height:6px; border-radius:50%; background:var(--text-muted); transition:background .3s; }
+.key-dot.active { background:var(--green); }
+.key-label { font-size:9px; color:var(--text-muted); letter-spacing:0.1em; }
+
+/* ─── API KEY MODAL ─── */
+.modal-backdrop {
+  position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(6px);
+  z-index:500; display:flex; align-items:center; justify-content:center;
+}
+.modal-backdrop.hidden { display:none; }
+.modal-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:32px; width:440px; max-width:90vw; display:flex; flex-direction:column; gap:16px;
+}
+.modal-title { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:300; color:var(--accent); letter-spacing:0.1em; }
+.modal-desc { font-size:11px; color:var(--text-dim); line-height:1.7; }
+.modal-desc a { color:var(--accent); text-decoration:none; }
+.modal-desc a:hover { text-decoration:underline; }
+.mode-row { display:flex; gap:6px; }
+.key-field-label { font-size:9px; letter-spacing:0.15em; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; }
+.key-input-row { display:flex; gap:8px; }
+.key-input {
+  flex:1; background:var(--bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text);
+  outline:none; transition:border-color .15s; letter-spacing:0.05em;
+}
+.key-input:focus { border-color:var(--accent); }
+.key-input::placeholder { color:var(--text-muted); }
+.modal-save-btn {
+  background:var(--accent); color:var(--bg); border:none; border-radius:var(--radius);
+  padding:10px 20px; font-family:'DM Mono',monospace; font-size:10px; font-weight:500;
+  letter-spacing:0.15em; cursor:pointer; transition:background .15s; white-space:nowrap; text-transform:uppercase;
+}
+.modal-save-btn:hover { background:var(--accent2); }
+.key-status { font-size:10px; padding:8px 12px; border-radius:var(--radius); border:1px solid; display:none; }
+.key-status.ok  { border-color:var(--green); color:var(--green); background:rgba(107,143,107,.08); display:block; }
+.key-status.err { border-color:var(--red);   color:var(--red);   background:rgba(143,107,107,.08); display:block; }
+.warn-text { font-size:9px; color:var(--red); margin-top:8px; line-height:1.6; }
+.modal-skip { font-size:10px; color:var(--text-muted); text-align:center; cursor:pointer; letter-spacing:.05em; }
+.modal-skip:hover { color:var(--text-dim); }
+
+/* ─── LAYOUT ─── */
+main { display:grid; grid-template-columns:340px 1fr; min-height:calc(100vh - 65px); }
+.panel-left {
+  border-right:1px solid var(--border); padding:24px;
+  display:flex; flex-direction:column; gap:20px; overflow-y:auto; max-height:calc(100vh - 65px);
+}
+
+/* ─── UPLOAD ─── */
+.section-label { font-size:9px; letter-spacing:.25em; color:var(--text-muted); text-transform:uppercase; padding-bottom:8px; border-bottom:1px solid var(--border); }
+
+.upload-zone {
+  border:1px dashed var(--border); border-radius:var(--radius); aspect-ratio:3/4;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; transition:border-color .2s, background .2s; position:relative; overflow:hidden; background:var(--surface);
+}
+.upload-zone:hover { border-color:var(--accent); background:var(--accent-dim); }
+.upload-zone.has-image { border-style:solid; border-color:var(--accent); }
+.upload-zone img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.upload-overlay {
+  position:absolute; inset:0; background:rgba(0,0,0,.55);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px;
+  opacity:0; transition:opacity .2s;
+}
+.upload-zone.has-image:hover .upload-overlay { opacity:1; }
+.overlay-replace { font-size:11px; color:#fff; letter-spacing:.1em; }
+.overlay-remove {
+  background:rgba(143,107,107,.85); border:1px solid var(--red); border-radius:var(--radius);
+  padding:5px 14px; font-family:'DM Mono',monospace; font-size:10px; color:#fff;
+  cursor:pointer; letter-spacing:.1em; transition:background .15s;
+}
+.overlay-remove:hover { background:rgba(160,90,90,1); }
+.upload-icon { font-size:32px; margin-bottom:8px; opacity:.5; }
+.upload-text { font-size:11px; color:var(--text-dim); text-align:center; letter-spacing:.1em; }
+#fileInput { display:none; }
+
+/* ─── PRESETS ─── */
+.preset-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.preset-btn {
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:8px 10px; font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim);
+  cursor:pointer; transition:all .15s; text-align:left; letter-spacing:.05em;
+}
+.preset-btn:hover { border-color:var(--accent); color:var(--accent); }
+.preset-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+
+/* ─── GENERATE BTN ─── */
+.generate-btn {
+  background:var(--accent); color:var(--bg); border:none; border-radius:var(--radius);
+  padding:14px; font-family:'DM Mono',monospace; font-size:11px; font-weight:500;
+  letter-spacing:.2em; cursor:pointer; transition:all .2s; text-transform:uppercase; width:100%;
+}
+.generate-btn:hover { background:var(--accent2); transform:translateY(-1px); }
+.generate-btn:active { transform:translateY(0); }
+.generate-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+
+/* ─── RIGHT PANEL ─── */
+.panel-right { display:flex; flex-direction:column; overflow:hidden; }
+.modules-area { flex:1; padding:24px; overflow-y:auto; display:flex; flex-direction:column; gap:20px; }
+.module-row { display:flex; flex-direction:column; gap:8px; }
+.module-title { font-size:9px; letter-spacing:.2em; color:var(--text-muted); text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip {
+  background:var(--surface); border:1px solid var(--border); border-radius:2px;
+  padding:5px 10px; font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim);
+  cursor:pointer; transition:all .15s; letter-spacing:.03em; user-select:none; white-space:nowrap;
+}
+.chip:hover { border-color:var(--accent); color:var(--text); }
+.chip.selected { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+.chip:focus-visible { outline:1px solid var(--accent); outline-offset:2px; }
+
+/* ─── OUTPUT ─── */
+.output-area { border-top:1px solid var(--border); background:var(--surface); padding:20px 24px; display:flex; flex-direction:column; gap:12px; min-height:160px; }
+.output-header { display:flex; align-items:center; justify-content:space-between; }
+.output-label { font-size:9px; letter-spacing:.2em; color:var(--text-muted); text-transform:uppercase; }
+.output-actions { display:flex; gap:8px; }
+.action-btn {
+  background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius);
+  padding:5px 12px; font-family:'DM Mono',monospace; font-size:10px; color:var(--text-dim);
+  cursor:pointer; transition:all .15s; letter-spacing:.05em;
+}
+.action-btn:hover { border-color:var(--accent); color:var(--accent); }
+.prompt-display {
+  font-family:'DM Mono',monospace; font-size:12px; color:var(--text); line-height:1.8;
+  min-height:60px; padding:12px; background:var(--bg); border:1px solid var(--border);
+  border-radius:var(--radius); white-space:pre-wrap; word-break:break-word;
+}
+.prompt-display .tag { color:var(--accent); }
+.prompt-display .connector { color:var(--text-muted); }
+.prompt-display.loading { color:var(--text-muted); font-style:italic; }
+.prompt-display.empty { color:var(--text-muted); font-size:11px; }
+
+/* ─── AI ANALYSIS ─── */
+.ai-analysis { border-top:1px solid var(--border); padding:16px 24px; background:rgba(201,168,76,.03); }
+.ai-title { font-size:9px; letter-spacing:.2em; color:var(--accent); text-transform:uppercase; margin-bottom:8px; }
+.ai-text { font-family:'Noto Serif TC',serif; font-size:12px; color:var(--text-dim); line-height:1.8; }
+
+/* ─── MISC ─── */
+@keyframes spin { to { transform:rotate(360deg); } }
+.spinner { display:inline-block; width:14px; height:14px; border:1.5px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:8px; }
+
+.selection-count { font-size:10px; color:var(--text-muted); text-align:right; padding:0 24px 8px; }
+.selection-count span { color:var(--accent); }
+
+.toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--accent); border-radius:var(--radius); padding:10px 16px; font-size:11px; color:var(--accent); transform:translateY(60px); opacity:0; transition:all .3s; z-index:1000; }
+.toast.show { transform:translateY(0); opacity:1; }
+
+::-webkit-scrollbar { width:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+.modules-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+@media (max-width:900px) {
+  main { grid-template-columns:1fr; }
+  .panel-left { max-height:none; border-right:none; border-bottom:1px solid var(--border); }
+  .modules-grid { grid-template-columns:1fr; }
+}
+
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.module-row { animation:fadeUp .3s ease both; }
+.module-row:nth-child(1){animation-delay:.05s} .module-row:nth-child(2){animation-delay:.10s}
+.module-row:nth-child(3){animation-delay:.15s} .module-row:nth-child(4){animation-delay:.20s}
+.module-row:nth-child(5){animation-delay:.25s} .module-row:nth-child(6){animation-delay:.30s}
+.module-row:nth-child(7){animation-delay:.35s} .module-row:nth-child(8){animation-delay:.40s}
+.module-row:nth-child(9){animation-delay:.45s} .module-row:nth-child(10){animation-delay:.50s}
+
+.star { color:var(--accent); font-size:8px; }
+</style>
+
+<!-- PWA Meta — auto-injected by PWA 打包神器 -->
+<meta name="application-name" content="Ai-PMP">
+<meta name="description" content="
+Ai-PMP">
+<meta name="theme-color" content="#1a73e8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ai-PMP">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').then(function(r){console.log('[SW] registered:',r.scope)}).catch(function(e){console.warn('[SW] failed:',e)});});}</script>
+</head>
+<body>
+
+<!-- ═══ FIX 1: API KEY MODAL ═══════════════════════════════════════════ -->
+<div class="modal-backdrop" id="keyModal">
+  <div class="modal-box">
+    <div class="modal-title">✦ API 設定</div>
+    <div class="modal-desc">
+      使用您的 <strong>Cloudflare Worker 網址</strong>（推薦，Key 不暴露於瀏覽器），
+      或直接輸入 Anthropic API Key（僅建議本機測試）。<br>
+      設定儲存於 localStorage，不上傳任何伺服器。<br>
+      取得 Key：<a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+    </div>
+
+    <div>
+      <div class="key-field-label">API 模式</div>
+      <div class="mode-row">
+        <button type="button" class="chip selected" id="modeWorker" onclick="setApiMode('worker')">⚡ Cloudflare Worker（推薦）</button>
+        <button type="button" class="chip" id="modeDirect" onclick="setApiMode('direct')">直連 Anthropic</button>
+      </div>
+    </div>
+
+    <div id="workerRow">
+      <div class="key-field-label">Worker 網址</div>
+      <div class="key-input-row">
+        <input class="key-input" id="workerUrl" type="url" placeholder="https://arcar.kftseng2oo1.workers.dev" spellcheck="false">
+        <button type="button" class="modal-save-btn" onclick="saveKey()">儲存</button>
+      </div>
+    </div>
+
+    <div id="directRow" style="display:none">
+      <div class="key-field-label">Anthropic API Key</div>
+      <div class="key-input-row">
+        <input class="key-input" id="apiKeyInput" type="password" placeholder="sk-ant-…" spellcheck="false" autocomplete="off">
+        <button type="button" class="modal-save-btn" onclick="saveKey()">儲存</button>
+      </div>
+      <div class="warn-text">⚠ Key 暴露於瀏覽器，僅供本機測試</div>
+    </div>
+
+    <div class="key-status" id="keyStatus"></div>
+    <div class="modal-skip" onclick="skipModal()">略過，不使用 AI 分析 →</div>
+  </div>
+</div>
+
+<!-- ═══ HEADER ══════════════════════════════════════════════════════════ -->
+<header>
+  <div>
+    <div class="logo">PROMPT <span>Studio</span></div>
+    <div class="badge">AI 攝影提示詞生成器 · 模組化系統 v2.1</div>
+  </div>
+  <div class="key-indicator" onclick="openKeyModal()" title="點擊設定 API">
+    <div class="key-dot" id="keyDot"></div>
+    <div class="key-label" id="keyLabel">未設定 Key</div>
+  </div>
+</header>
+
+<!-- ═══ MAIN ════════════════════════════════════════════════════════════ -->
+<main>
+  <!-- LEFT -->
+  <div class="panel-left">
+
+    <div>
+      <div class="section-label" style="margin-bottom:12px">參考照片</div>
+      <div class="upload-zone" id="uploadZone">
+        <div id="uploadIcon" class="upload-icon">⊕</div>
+        <div id="uploadText" class="upload-text">點擊上傳個人照片<br><br>支援 JPG · PNG · WEBP</div>
+        <!-- FIX 2a: overlay has both replace hint and explicit remove button -->
+        <div class="upload-overlay">
+          <div class="overlay-replace">↺ 點擊更換照片</div>
+          <button type="button" class="overlay-remove" id="removePhotoBtn">✕ 移除照片</button>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div>
+      <div class="section-label" style="margin-bottom:10px">快速風格預設</div>
+      <div class="preset-grid">
+        <button type="button" class="preset-btn" data-preset="outdoor">🌸 戶外花田</button>
+        <button type="button" class="preset-btn" data-preset="cinematic">🎬 電影感</button>
+        <button type="button" class="preset-btn" data-preset="winter">❄️ 雪山冬景</button>
+        <button type="button" class="preset-btn" data-preset="forest">🌿 森林秘境</button>
+        <button type="button" class="preset-btn" data-preset="golden">🌅 黃金時刻</button>
+        <button type="button" class="preset-btn" data-preset="moody">🌧️ 氛圍寫真</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label" style="margin-bottom:10px">AI 深度分析</div>
+      <button type="button" class="generate-btn" id="analyzeBtn">✦ &nbsp;生成專屬提示詞</button>
+    </div>
+
+    <div style="font-size:10px;color:var(--text-muted);line-height:1.9">
+      ① 點右上角設定 API Key<br>
+      ② 上傳個人照片<br>
+      ③ 選擇模組或風格預設<br>
+      ④ 點擊生成提示詞<br>
+      ⑤ 複製貼入 Midjourney / SDXL
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel-right">
+    <div class="modules-area">
+
+      <div class="modules-grid">
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★☆</span> 人物動作</div>
+          <div class="chips" data-module="action">
+            <button type="button" class="chip" data-val="walking slowly">walking slowly</button>
+            <button type="button" class="chip" data-val="standing naturally">standing naturally</button>
+            <button type="button" class="chip" data-val="looking into the distance">gazing afar</button>
+            <button type="button" class="chip" data-val="touching flowers gently">touching flowers</button>
+            <button type="button" class="chip" data-val="sitting on grass">sitting on grass</button>
+            <button type="button" class="chip" data-val="turning back gently">turning back</button>
+            <button type="button" class="chip" data-val="running through field">running freely</button>
+            <button type="button" class="chip" data-val="arms outstretched">arms open wide</button>
+          </div>
+        </div>
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★☆☆</span> 表情情緒</div>
+          <div class="chips" data-module="expression">
+            <button type="button" class="chip" data-val="peaceful smile">peaceful smile</button>
+            <button type="button" class="chip" data-val="joyful expression">joyful</button>
+            <button type="button" class="chip" data-val="calm mood">calm mood</button>
+            <button type="button" class="chip" data-val="thoughtful gaze">thoughtful</button>
+            <button type="button" class="chip" data-val="relaxed feeling">relaxed</button>
+            <button type="button" class="chip" data-val="dreamy look">dreamy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="module-row">
+        <div class="module-title"><span class="star">★★★★★</span> 場景 <span style="color:var(--text-muted)">（最重要）</span></div>
+        <div class="chips" data-module="scene">
+          <button type="button" class="chip" data-val="flower-covered hillside">花丘山坡</button>
+          <button type="button" class="chip" data-val="alpine meadow with wildflowers">高山草甸</button>
+          <button type="button" class="chip" data-val="bamboo forest path">竹林小徑</button>
+          <button type="button" class="chip" data-val="snowy mountain landscape">雪山景致</button>
+          <button type="button" class="chip" data-val="seaside cliff with ocean view">海岸懸崖</button>
+          <button type="button" class="chip" data-val="lavender field">薰衣草田</button>
+          <button type="button" class="chip" data-val="golden wheat field">麥田金浪</button>
+          <button type="button" class="chip" data-val="ancient forest with tall trees">古老森林</button>
+          <button type="button" class="chip" data-val="cherry blossom grove">櫻花樹林</button>
+          <button type="button" class="chip" data-val="misty mountain valley">雲霧山谷</button>
+          <button type="button" class="chip" data-val="sunflower field">向日葵田</button>
+          <button type="button" class="chip" data-val="autumn maple forest">楓葉秋林</button>
+        </div>
+      </div>
+
+      <div class="modules-grid">
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★★</span> 光線類型</div>
+          <div class="chips" data-module="light">
+            <button type="button" class="chip" data-val="golden hour sunlight">黃金時刻</button>
+            <button type="button" class="chip" data-val="soft diffused overcast light">柔和散射光</button>
+            <button type="button" class="chip" data-val="dramatic sunset backlight">夕陽逆光</button>
+            <button type="button" class="chip" data-val="soft morning light">清晨晨光</button>
+            <button type="button" class="chip" data-val="cinematic natural lighting">電影自然光</button>
+            <button type="button" class="chip" data-val="dappled forest light">林間光斑</button>
+            <button type="button" class="chip" data-val="blue hour twilight">藍調暮色</button>
+          </div>
+        </div>
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★☆</span> 天氣氣氛</div>
+          <div class="chips" data-module="weather">
+            <button type="button" class="chip" data-val="soft morning mist">清晨薄霧</button>
+            <button type="button" class="chip" data-val="floating pollen in air">漂浮花粉</button>
+            <button type="button" class="chip" data-val="gentle snowfall">輕柔飄雪</button>
+            <button type="button" class="chip" data-val="ocean sea mist">海洋霧氣</button>
+            <button type="button" class="chip" data-val="light drizzle atmosphere">細雨朦朧</button>
+            <button type="button" class="chip" data-val="warm sunny clear sky">晴空萬里</button>
+            <button type="button" class="chip" data-val="dramatic storm clouds">戲劇雲層</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modules-grid">
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★☆</span> 鏡頭焦段</div>
+          <div class="chips" data-module="lens">
+            <button type="button" class="chip" data-val="35mm lens">35mm</button>
+            <button type="button" class="chip" data-val="50mm portrait lens">50mm</button>
+            <button type="button" class="chip" data-val="85mm portrait lens">85mm</button>
+            <button type="button" class="chip" data-val="24mm wide angle lens">24mm 廣角</button>
+            <button type="button" class="chip" data-val="135mm telephoto lens">135mm 長焦</button>
+          </div>
+        </div>
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★☆</span> 景深效果</div>
+          <div class="chips" data-module="dof">
+            <button type="button" class="chip" data-val="shallow depth of field, creamy bokeh">奶油散景</button>
+            <button type="button" class="chip" data-val="cinematic focus">電影對焦</button>
+            <button type="button" class="chip" data-val="soft background blur">背景柔焦</button>
+            <button type="button" class="chip" data-val="sharp throughout">全景清晰</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modules-grid">
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★★</span> 環境互動 <span style="color:var(--text-muted)">（避免貼圖感）</span></div>
+          <div class="chips" data-module="interaction">
+            <button type="button" class="chip" data-val="flowers touching clothing naturally">花朵碰衣</button>
+            <button type="button" class="chip" data-val="wind moving hair softly">風吹秀髮</button>
+            <button type="button" class="chip" data-val="feet partially hidden in tall grass">腳藏草中</button>
+            <button type="button" class="chip" data-val="snow footprints on ground">雪地腳印</button>
+            <button type="button" class="chip" data-val="clothing reacting to gentle breeze">衣擺飄動</button>
+            <button type="button" class="chip" data-val="leaves falling around subject">落葉環繞</button>
+            <button type="button" class="chip" data-val="blurred foreground flowers framing">前景花朵框景</button>
+          </div>
+        </div>
+        <div class="module-row">
+          <div class="module-title"><span class="star">★★★★☆</span> 色彩風格</div>
+          <div class="chips" data-module="color">
+            <button type="button" class="chip" data-val="warm earthy tones">大地暖調</button>
+            <button type="button" class="chip" data-val="soft pastel color palette">粉嫩柔和</button>
+            <button type="button" class="chip" data-val="cinematic color grading">電影調色</button>
+            <button type="button" class="chip" data-val="natural film color">自然底片</button>
+            <button type="button" class="chip" data-val="moody desaturated tones">低飽和氛圍</button>
+            <button type="button" class="chip" data-val="vibrant vivid colors">鮮豔濃郁</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="module-row">
+        <div class="module-title"><span class="star">★★★★★</span> 真實感強化</div>
+        <div class="chips" data-module="realism">
+          <button type="button" class="chip selected" data-val="photorealistic DSLR photography">photorealistic DSLR</button>
+          <button type="button" class="chip" data-val="RAW photo, ultra realistic">RAW photo</button>
+          <button type="button" class="chip" data-val="captured on 35mm film">35mm film</button>
+          <button type="button" class="chip" data-val="realistic skin texture, natural shadows">真實膚質</button>
+          <button type="button" class="chip" data-val="volumetric light, sunlight reflecting on skin">體積光+膚光</button>
+          <button type="button" class="chip" data-val="highly detailed, high dynamic range">高細節HDR</button>
+        </div>
+      </div>
+
+      <div class="module-row">
+        <div class="module-title"><span class="star">★★★★☆</span> 構圖方式</div>
+        <div class="chips" data-module="composition">
+          <button type="button" class="chip" data-val="cinematic composition">電影構圖</button>
+          <button type="button" class="chip" data-val="off-center natural framing">偏心構圖</button>
+          <button type="button" class="chip" data-val="documentary style framing">紀實感</button>
+          <button type="button" class="chip" data-val="atmospheric perspective, layered depth">大氣透視</button>
+          <button type="button" class="chip" data-val="rule of thirds composition">三分構圖</button>
+        </div>
+      </div>
+
+    </div><!-- /modules-area -->
+
+    <div class="selection-count">已選擇 <span id="selNum">1</span> 個模組</div>
+
+    <div class="ai-analysis" id="aiSection" style="display:none">
+      <div class="ai-title">✦ AI 分析建議</div>
+      <div class="ai-text" id="aiText"></div>
+    </div>
+
+    <div class="output-area">
+      <div class="output-header">
+        <div class="output-label">生成提示詞</div>
+        <div class="output-actions">
+          <button type="button" class="action-btn" id="copyBtn">複製</button>
+          <button type="button" class="action-btn" id="resetBtn">重置</button>
+        </div>
+      </div>
+      <div class="prompt-display empty" id="promptDisplay">選擇模組後點擊「生成專屬提示詞」…</div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+var state = {
+  imageBase64: null,
+  imageMime: 'image/jpeg',
+  selections: { realism: 'photorealistic DSLR photography' },
+  generatedPrompt: '',
+  apiMode: 'worker',
+  workerUrl: '',
+  apiKey: ''
+};
+
+// ════════════════════════════════════════════════
+// PRESETS
+// ════════════════════════════════════════════════
+var PRESETS = {
+  outdoor:  {scene:'flower-covered hillside',light:'golden hour sunlight',weather:'floating pollen in air',lens:'85mm portrait lens',dof:'shallow depth of field, creamy bokeh',interaction:'flowers touching clothing naturally',color:'warm earthy tones',action:'walking slowly',realism:'photorealistic DSLR photography'},
+  cinematic:{scene:'misty mountain valley',light:'cinematic natural lighting',lens:'35mm lens',dof:'cinematic focus',color:'cinematic color grading',composition:'cinematic composition',action:'standing naturally',realism:'RAW photo, ultra realistic'},
+  winter:   {scene:'snowy mountain landscape',light:'soft diffused overcast light',weather:'gentle snowfall',lens:'85mm portrait lens',dof:'shallow depth of field, creamy bokeh',interaction:'snow footprints on ground',color:'moody desaturated tones',action:'standing naturally',realism:'photorealistic DSLR photography'},
+  forest:   {scene:'ancient forest with tall trees',light:'dappled forest light',weather:'soft morning mist',lens:'35mm lens',dof:'cinematic focus',interaction:'leaves falling around subject',color:'natural film color',action:'walking slowly',realism:'captured on 35mm film'},
+  golden:   {scene:'golden wheat field',light:'dramatic sunset backlight',lens:'85mm portrait lens',dof:'shallow depth of field, creamy bokeh',interaction:'clothing reacting to gentle breeze',color:'warm earthy tones',action:'arms outstretched',realism:'photorealistic DSLR photography',composition:'off-center natural framing'},
+  moody:    {scene:'seaside cliff with ocean view',light:'blue hour twilight',weather:'ocean sea mist',lens:'50mm portrait lens',dof:'soft background blur',color:'moody desaturated tones',action:'looking into the distance',realism:'RAW photo, ultra realistic',composition:'atmospheric perspective, layered depth'}
+};
+
+// ════════════════════════════════════════════════
+// FIX 1: API KEY MODAL
+// ════════════════════════════════════════════════
+function loadSavedKey() {
+  state.apiMode  = localStorage.getItem('ps_api_mode')   || 'worker';
+  state.workerUrl= localStorage.getItem('ps_worker_url') || '';
+  state.apiKey   = localStorage.getItem('ps_api_key')    || '';
+  document.getElementById('workerUrl').value  = state.workerUrl;
+  document.getElementById('apiKeyInput').value= state.apiKey;
+  setApiMode(state.apiMode, true);
+  updateKeyIndicator();
+}
+
+function setApiMode(mode, silent) {
+  state.apiMode = mode;
+  document.getElementById('workerRow').style.display = mode === 'worker' ? 'block' : 'none';
+  document.getElementById('directRow').style.display = mode === 'direct' ? 'block' : 'none';
+  document.getElementById('modeWorker').classList.toggle('selected', mode === 'worker');
+  document.getElementById('modeDirect').classList.toggle('selected', mode === 'direct');
+}
+
+function saveKey() {
+  if (state.apiMode === 'worker') {
+    var url = document.getElementById('workerUrl').value.trim();
+    if (!url) { showStatus('請輸入 Worker 網址', 'err'); return; }
+    state.workerUrl = url;
+    localStorage.setItem('ps_worker_url', url);
+  } else {
+    var key = document.getElementById('apiKeyInput').value.trim();
+    if (!key.startsWith('sk-ant-')) { showStatus('Key 格式錯誤（應以 sk-ant- 開頭）', 'err'); return; }
+    state.apiKey = key;
+    localStorage.setItem('ps_api_key', key);
+  }
+  localStorage.setItem('ps_api_mode', state.apiMode);
+  showStatus('✓ 已儲存', 'ok');
+  updateKeyIndicator();
+  setTimeout(closeModal, 800);
+}
+
+function showStatus(msg, type) {
+  var el = document.getElementById('keyStatus');
+  el.textContent = msg;
+  el.className = 'key-status ' + type;
+}
+function closeModal() { document.getElementById('keyModal').classList.add('hidden'); }
+function openKeyModal() { document.getElementById('keyStatus').className = 'key-status'; document.getElementById('keyModal').classList.remove('hidden'); }
+function skipModal() { closeModal(); }
+
+function updateKeyIndicator() {
+  var has = (state.apiMode === 'worker' && state.workerUrl) || (state.apiMode === 'direct' && state.apiKey);
+  document.getElementById('keyDot').classList.toggle('active', !!has);
+  document.getElementById('keyLabel').textContent = has ? (state.apiMode === 'worker' ? 'Worker 已連接' : 'Direct API') : '未設定 Key';
+}
+
+// ════════════════════════════════════════════════
+// FIX 2a: UPLOAD + REMOVE
+// ════════════════════════════════════════════════
+var uploadZone = document.getElementById('uploadZone');
+var fileInput  = document.getElementById('fileInput');
+var removeBtn  = document.getElementById('removePhotoBtn');
+
+uploadZone.addEventListener('click', function(e) {
+  // Don't open file picker if clicking the remove button
+  if (removeBtn.contains(e.target)) return;
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    state.imageBase64 = ev.target.result.split(',')[1];
+    state.imageMime   = file.type || 'image/jpeg';
+    uploadZone.classList.add('has-image');
+    var img = uploadZone.querySelector('img');
+    if (!img) { img = document.createElement('img'); uploadZone.insertBefore(img, uploadZone.firstChild); }
+    img.src = ev.target.result;
+    document.getElementById('uploadIcon').style.display = 'none';
+    document.getElementById('uploadText').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  e.target.value = ''; // allow re-selecting same file
+});
+
+removeBtn.addEventListener('click', function(e) {
+  e.stopPropagation();
+  state.imageBase64 = null;
+  state.imageMime = 'image/jpeg';
+  uploadZone.classList.remove('has-image');
+  var img = uploadZone.querySelector('img');
+  if (img) img.remove();
+  document.getElementById('uploadIcon').style.display = '';
+  document.getElementById('uploadText').style.display = '';
+  fileInput.value = '';
+  showToast('已移除照片');
+});
+
+// ════════════════════════════════════════════════
+// FIX 4: CHIPS as <button type="button">
+// ════════════════════════════════════════════════
+document.querySelectorAll('.chip[data-val]').forEach(function(chip) {
+  chip.addEventListener('click', function() {
+    var mod = this.closest('[data-module]').dataset.module;
+    var val = this.dataset.val;
+    if (this.classList.contains('selected')) {
+      this.classList.remove('selected');
+      delete state.selections[mod];
+    } else {
+      this.closest('[data-module]').querySelectorAll('.chip').forEach(function(c){ c.classList.remove('selected'); });
+      this.classList.add('selected');
+      state.selections[mod] = val;
+    }
+    updateCount();
+  });
+});
+
+function updateCount() { document.getElementById('selNum').textContent = Object.keys(state.selections).length; }
+
+// ════════════════════════════════════════════════
+// FIX 2b: PRESET – only overwrite preset-defined modules
+// ════════════════════════════════════════════════
+document.querySelectorAll('.preset-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+    this.classList.add('active');
+    var preset = PRESETS[this.dataset.preset];
+    // Clear only the modules this preset defines
+    Object.keys(preset).forEach(function(mod) {
+      var c = document.querySelector('[data-module="'+mod+'"]');
+      if (c) c.querySelectorAll('.chip').forEach(function(ch){ ch.classList.remove('selected'); });
+      delete state.selections[mod];
+    });
+    // Apply preset selections
+    Object.keys(preset).forEach(function(mod) {
+      state.selections[mod] = preset[mod];
+      var container = document.querySelector('[data-module="'+mod+'"]');
+      if (container) {
+        var chip = Array.from(container.querySelectorAll('.chip')).find(function(c){ return c.dataset.val === preset[mod]; });
+        if (chip) chip.classList.add('selected');
+      }
+    });
+    updateCount();
+  });
+});
+
+// ════════════════════════════════════════════════
+// FIX 3: NATURAL LANGUAGE PROMPT BUILDER
+// ════════════════════════════════════════════════
+function buildPromptFromSelections() {
+  var s = state.selections;
+  // 1. Subject + action + expression
+  var prompt = 'A realistic portrait photograph of the person from the reference image';
+  if (s.action)     prompt += ', ' + s.action;
+  if (s.expression) prompt += ' with a ' + s.expression;
+  // 2. Scene + weather
+  if (s.scene)      prompt += ', set against a ' + s.scene;
+  if (s.weather)    prompt += ', under ' + s.weather;
+  // 3. Camera gear + light
+  var cam = [s.lens, s.dof].filter(Boolean).join(' with ');
+  if (cam)          prompt += ', shot on ' + cam;
+  if (s.light)      prompt += ', illuminated by ' + s.light;
+  // 4. Detail layer
+  var details = [s.interaction, s.composition, s.color, s.realism].filter(Boolean);
+  if (details.length) prompt += ', ' + details.join(', ');
+  return prompt;
+}
+
+// ════════════════════════════════════════════════
+// GENERATE
+// ════════════════════════════════════════════════
+document.getElementById('analyzeBtn').addEventListener('click', analyzeAndGenerate);
+
+async function analyzeAndGenerate() {
+  var btn       = document.getElementById('analyzeBtn');
+  var display   = document.getElementById('promptDisplay');
+  var aiSection = document.getElementById('aiSection');
+  var aiText    = document.getElementById('aiText');
+  var base      = buildPromptFromSelections();
+
+  // No image → just assemble
+  if (!state.imageBase64) {
+    if (!Object.keys(state.selections).length) { showToast('請先選擇至少一個模組'); return; }
+    displayPrompt(base);
+    aiSection.style.display = 'none';
+    return;
+  }
+
+  // Need API config
+  var hasConfig = (state.apiMode === 'worker' && state.workerUrl) ||
+                  (state.apiMode === 'direct' && state.apiKey);
+  if (!hasConfig) { openKeyModal(); showToast('請先設定 API Key'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '分析中…';
+  display.className = 'prompt-display loading';
+  display.innerHTML = '<span class="spinner"></span>AI 正在分析您的照片…';
+  aiSection.style.display = 'none';
+
+  try {
+    var payload = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: [
+          { type:'image', source:{ type:'base64', media_type: state.imageMime, data: state.imageBase64 } },
+          { type:'text', text: '你是 AI 圖像生成提示詞專家。請輸出以下格式（嚴格遵守）：\n\n[分析]\n分析人物外觀特徵（髮色、服裝風格），推薦最適場景，共3-4句中文。\n\n[優化提示詞]\n針對此人物優化以下提示詞，只輸出英文提示詞，不加說明。\n\n基礎提示詞：' + base }
+        ]
+      }]
+    };
+
+    var url, headers;
+    if (state.apiMode === 'worker') {
+      url     = state.workerUrl;
+      headers = { 'Content-Type': 'application/json' };
+    } else {
+      url     = 'https://api.anthropic.com/v1/messages';
+      headers = { 'Content-Type':'application/json', 'x-api-key': state.apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' };
+    }
+
+    var resp = await fetch(url, { method:'POST', headers: headers, body: JSON.stringify(payload) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    var text = (data.content||[]).map(function(i){ return i.text||''; }).join('');
+
+    var aMatch = text.match(/\[分析\]([\s\S]*?)\[優化提示詞\]/);
+    var pMatch = text.match(/\[優化提示詞\]([\s\S]*?)$/);
+    var analysis = aMatch ? aMatch[1].trim() : '';
+    var optimized= pMatch ? pMatch[1].trim() : base;
+
+    displayPrompt(optimized);
+    if (analysis) { aiSection.style.display = 'block'; aiText.textContent = analysis; }
+
+  } catch(err) {
+    console.error(err);
+    displayPrompt(base);
+    showToast('API 呼叫失敗，已顯示基礎提示詞');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✦  生成專屬提示詞';
+}
+
+// ════════════════════════════════════════════════
+// FIX 4: DISPLAY – highlight by actual selection values
+// ════════════════════════════════════════════════
+function displayPrompt(prompt) {
+  state.generatedPrompt = prompt;
+  var display = document.getElementById('promptDisplay');
+  display.className = 'prompt-display';
+  var vals = Object.values(state.selections);
+  var parts = prompt.split(', ');
+  display.innerHTML = parts.map(function(p, i) {
+    var hi = vals.some(function(v){ return p.includes(v); }) ||
+             p.includes('reference image') || p.startsWith('A realistic portrait');
+    return '<span class="'+(hi?'tag':'')+'">' + p.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>' +
+           (i < parts.length-1 ? '<span class="connector">, </span>' : '');
+  }).join('');
+}
+
+// ════════════════════════════════════════════════
+// COPY + RESET
+// ════════════════════════════════════════════════
+document.getElementById('copyBtn').addEventListener('click', function() {
+  if (!state.generatedPrompt) { showToast('尚未生成提示詞'); return; }
+  navigator.clipboard.writeText(state.generatedPrompt).then(function(){ showToast('✓ 已複製到剪貼簿'); });
+});
+
+document.getElementById('resetBtn').addEventListener('click', function() {
+  document.querySelectorAll('.chip[data-val]').forEach(function(c){ c.classList.remove('selected'); });
+  document.querySelectorAll('.preset-btn').forEach(function(b){ b.classList.remove('active'); });
+  state.selections = { realism: 'photorealistic DSLR photography' };
+  var def = document.querySelector('[data-val="photorealistic DSLR photography"]');
+  if (def) def.classList.add('selected');
+  state.generatedPrompt = '';
+  var d = document.getElementById('promptDisplay');
+  d.className = 'prompt-display empty';
+  d.textContent = '選擇模組後點擊「生成專屬提示詞」…';
+  document.getElementById('aiSection').style.display = 'none';
+  updateCount();
+});
+
+// ════════════════════════════════════════════════
+// TOAST
+// ════════════════════════════════════════════════
+var toastTimer;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+// ════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════
+loadSavedKey();
+updateCount();
+var savedKey = localStorage.getItem('ps_worker_url') || localStorage.getItem('ps_api_key');
+if (savedKey) document.getElementById('keyModal').classList.add('hidden');
+</script>
+</body>
+</html>
